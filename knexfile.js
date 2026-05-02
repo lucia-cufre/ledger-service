@@ -1,7 +1,8 @@
-import type { Knex } from 'knex';
 import 'dotenv/config';
 
-const config: { [key: string]: Knex.Config } = {
+/** @type {Object.<string, import('knex').Knex.Config>} */
+
+const config = {
   development: {
     client: 'pg',
     connection: process.env.DATABASE_URL,

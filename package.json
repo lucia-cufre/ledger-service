@@ -15,7 +15,7 @@
     "lint:fix": "eslint . --ext .ts --fix",
     "prettier:fix": "npx prettier app locales assets --write",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "knex": "ts-node ./node_modules/.bin/knex --knexfile knexfile.ts",
+    "knex": "knex --knexfile knexfile.js",
     "migrate:make": "npm run knex -- migrate:make -x ts",
     "migrate:latest": "npm run knex -- migrate:latest",
     "migrate:rollback": "npm run knex -- migrate:rollback",
