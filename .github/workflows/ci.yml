@@ -37,9 +37,9 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
-      - run: npx prisma generate
+      - run: npm run migrate:latest
       - run: npm run lint
       - run: npm test
         env:
-          DATABASE_URL: postgresql://ledger:ledger@localhost:5432/ledger?schema=public
+          DATABASE_URL: postgresql://ledger:ledger@localhost:5432/ledger
           REDIS_URL: redis://localhost:6379

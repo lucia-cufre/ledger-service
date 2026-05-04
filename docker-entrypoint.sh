@@ -26,16 +26,6 @@ else
     cd ../..
   fi
 
-  # # Sync Prisma schema with database and regenerate client
-  # echo "Syncing Prisma schema with database..."
-  # npx prisma db pull || {
-  #   echo "Warning: prisma db pull failed, continuing with existing schema..."
-  # }
-
-  echo "Regenerating Prisma client..."
-  npx prisma generate || {
-    echo "Warning: prisma generate failed, continuing with existing client..."
-  }
 fi
 
 # 🔑 Generar UUID para CHARIZARD_TOKEN_SECRET si no existe
