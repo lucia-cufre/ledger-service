@@ -1,47 +1,21 @@
 #!/bin/bash
 set -e
 
+echo "Waiting for PostgreSQL to be ready..."
+until pg_isready -d "$DATABASE_URL" > /dev/null 2>&1; do
+  sleep 1
+done
+echo "PostgreSQL is ready."
 
+# Extract DB name and build a maintenance URL (connect to 'postgres' DB to run CREATE DATABASE)
+DB_NAME=$(node -e "const u = new URL('$DATABASE_URL'); console.log(u.pathname.slice(1))")
+MAINTENANCE_URL=$(node -e "const u = new URL('$DATABASE_URL'); u.pathname='/postgres'; u.search=''; console.log(u.toString())")
 
-if [ -z "${CELEBI_HOSTNAME}" ]
-then
-  echo "Skipping migrations because hostname is not set"
-else
-  echo "Running migrations on $CELEBI_HOSTNAME"
+echo "Ensuring database '$DB_NAME' exists..."
+psql "$MAINTENANCE_URL" -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 \
+  || psql "$MAINTENANCE_URL" -c "CREATE DATABASE \"$DB_NAME\""
 
-  # Try Knex migrations first (new system)
-  if [ -f "./knexfile.ts" ] || [ -f "./build/knexfile.js" ]; then
-    echo "Running Knex migrations..."
-    npm run migrate:latest || {
-      echo "Knex migrations failed, falling back to legacy SQL migrations..."
-      cd ./DB/migrations
-      ./migrations.sh || true
-      cd ../..
-    }
-  else
-    # Fallback to legacy SQL migrations
-    echo "Running legacy SQL migrations..."
-    cd ./DB/migrations
-    ./migrations.sh || true
-    cd ../..
-  fi
+echo "Running migrations..."
+npm run migrate:latest
 
-fi
-
-# 🔑 Generar UUID para CHARIZARD_TOKEN_SECRET si no existe
-if [ -z "$CHARIZARD_TOKEN_SECRET" ] || [ "$CHARIZARD_TOKEN_SECRET" = "" ]; then
-    # Verificar si uuidgen está disponible
-    if command -v uuidgen >/dev/null 2>&1; then
-        export CHARIZARD_TOKEN_SECRET=$(uuidgen)
-        echo "🔑 Generated new CHARIZARD_TOKEN_SECRET: $CHARIZARD_TOKEN_SECRET"
-    else
-        echo "❌ Error: uuidgen not found. Please install uuid-runtime package."
-        exit 1
-    fi
-else
-    echo "🔑 Using provided CHARIZARD_TOKEN_SECRET: ${CHARIZARD_TOKEN_SECRET:0:8}..."
-fi
-
-
-# start command from Dockerfile
-tini -s -- "$@"
+exec tini -s -- "$@"
