@@ -15,7 +15,7 @@ export interface AccountWithBalance extends Account {
   balance: string;
 }
 
-export interface CreateAccountInput {
+export interface CreateAccountData {
   name: string;
   type: AccountType;
   currency: string;
