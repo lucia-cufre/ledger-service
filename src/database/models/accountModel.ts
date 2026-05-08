@@ -1,3 +1,6 @@
+import type { z } from 'zod';
+import { createAccountSchema } from '../../lib/validators.js';
+
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
 
 export interface Account {
@@ -15,10 +18,4 @@ export interface AccountWithBalance extends Account {
   balance: string;
 }
 
-export interface CreateAccountData {
-  name: string;
-  type: AccountType;
-  currency: string;
-  description?: string;
-  is_system?: boolean;
-}
+export type CreateAccountData = z.infer<typeof createAccountSchema>;
