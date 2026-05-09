@@ -1,7 +1,17 @@
 import type { Request, Response, NextFunction } from 'express';
-import z, { ZodError } from 'zod';
+import { ZodError } from 'zod';
 import { ApplicationError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
+
+function zodFieldErrors(err: ZodError): Record<string, string[]> {
+  return err.issues.reduce<Record<string, string[]>>((acc, issue) => {
+    const key = issue.path[0] as string;
+    if (key) {
+      acc[key] = [...(acc[key] ?? []), issue.message];
+    }
+    return acc;
+  }, {});
+}
 
 export function errorHandler(
   err: Error,
@@ -17,7 +27,7 @@ export function errorHandler(
       error: {
         code: 'VALIDATION_ERROR',
         message: 'Invalid request data',
-        details: z.treeifyError(err),
+        details: zodFieldErrors(err),
         request_id: requestId,
       },
     });
