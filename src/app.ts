@@ -1,5 +1,6 @@
 import express from 'express';
-import { logger } from './lib/logger.js';
+import routes from './routes/index.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp() {
   const app = express();
@@ -10,10 +11,9 @@ export function createApp() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    logger.error({ err }, 'Unhandled error');
-    res.status(500).json({ error: 'Internal Server Error' });
-  });
+  app.use(routes);
+
+  app.use(errorHandler);
 
   return app;
 }

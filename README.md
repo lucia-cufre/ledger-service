@@ -155,7 +155,7 @@ src/
   lib/logger.ts             # Structured logger (Pino)
   database/
     models/                 # TypeScript types for DB entities
-    migrationService.ts     # Migration runner
+    client.ts               # Migration runner connections
 
 knex/
   migrations/               # Schema migrations (Knex)
