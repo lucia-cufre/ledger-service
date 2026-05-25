@@ -1,6 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
-import { createAccountSchema, uuidSchema } from '../lib/validators.js';
+import { uuidSchema } from '../lib/validators/utils-validators.js';
 import { createAccount, getAccountById, listAccounts } from '../services/accounts/index.js';
+import { createAccountSchema } from '../lib/validators/account-validators.js';
 
 const router = Router();
 

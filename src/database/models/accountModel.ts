@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { createAccountSchema } from '../../lib/validators.js';
+import { createAccountSchema } from '../../lib/validators/account-validators.js';
 
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
 
