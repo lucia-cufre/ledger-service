@@ -5,6 +5,7 @@ import { createAccountSchema } from '../lib/validators/account-validators.js';
 
 const router = Router();
 
+// ─── GET /accounts/ ─────────────────────────────────────────────────
 router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const accounts = await listAccounts();
@@ -14,6 +15,7 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// ─── GET /accounts/:id ─────────────────────────────────────────────────
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = uuidSchema.parse(req.params['id']);
@@ -24,6 +26,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// ─── POST /accounts/ ─────────────────────────────────────────────────
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = createAccountSchema.parse(req.body);

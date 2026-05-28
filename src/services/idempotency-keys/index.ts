@@ -1,10 +1,11 @@
 import { db } from "../../database/client.js";
+import { TransferWithEntries } from "../../database/models/transferModel.js";
 
 export async function storeIdempotencyKey(
   key: string,
   requestHash: string,
   responseStatus: number,
-  responseBody: Record<string, unknown>,
+  responseBody: Record<string, TransferWithEntries>,
 ): Promise<void> {
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + 24);

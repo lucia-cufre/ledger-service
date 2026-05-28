@@ -27,7 +27,9 @@ export async function getTransferById(id: string): Promise<TransferWithEntries> 
 
     return { ...transfer, entries };
   } catch (error) {
-    logger.error(`Error fetching transfer: ${error instanceof Error ? error.message : String(error)}`);
+    logger.error(
+      `Error fetching transfer: ${error instanceof Error ? error.message : String(error)}`,
+    );
     throw error;
   }
 }
@@ -48,13 +50,18 @@ export async function createTransfer(input: CreateTransferInput): Promise<Transf
         .where({ idempotency_key: input.idempotency_key })
         .first();
       if (existing) {
-        const existingEntries: Entry[] = await transaction('entries').where({ transfer_id: existing.id });
+        const existingEntries: Entry[] = await transaction('entries').where({
+          transfer_id: existing.id,
+        });
         return { ...existing, entries: existingEntries };
       }
 
       // Lock account rows and validate existence + sufficient funds inside the
       // transaction to prevent time-of-check/time-of-use races with concurrent transfers
-      await validateAccountsExist(transaction, input.entries.map((e) => e.account_id));
+      await validateAccountsExist(
+        transaction,
+        input.entries.map((e) => e.account_id),
+      );
       await validateSufficientFunds(transaction, input.entries);
 
       const [transfer]: Transfer[] = await transaction('transfers')
@@ -88,7 +95,9 @@ export async function createTransfer(input: CreateTransferInput): Promise<Transf
 
     return result;
   } catch (error) {
-    logger.error(`Error creating transfer: ${error instanceof Error ? error.message : String(error)}`);
+    logger.error(
+      `Error creating transfer: ${error instanceof Error ? error.message : String(error)}`,
+    );
     throw error;
   }
 }
@@ -117,7 +126,10 @@ export async function voidTransfer(id: string, reason: string): Promise<Transfer
 
     const result = await db.transaction(async (transaction) => {
       // Lock accounts and verify the reversal won't overdraft any account
-      await validateAccountsExist(transaction, original.entries.map((e) => e.account_id));
+      await validateAccountsExist(
+        transaction,
+        original.entries.map((e) => e.account_id),
+      );
       await validateSufficientFunds(transaction, reversalEntries);
 
       await transaction('transfers').where({ id }).update({
@@ -156,7 +168,9 @@ export async function voidTransfer(id: string, reason: string): Promise<Transfer
 
     return result;
   } catch (error) {
-    logger.error(`Error voiding transfer: ${error instanceof Error ? error.message : String(error)}`);
+    logger.error(
+      `Error voiding transfer: ${error instanceof Error ? error.message : String(error)}`,
+    );
     throw error;
   }
 }
@@ -186,9 +200,15 @@ function validateCurrencies(entries: CreateTransferInput['entries']): void {
   }
 }
 
-async function validateAccountsExist(transaction: Knex.Transaction, accountIds: string[]): Promise<void> {
+async function validateAccountsExist(
+  transaction: Knex.Transaction,
+  accountIds: string[],
+): Promise<void> {
   const uniqueIds = [...new Set(accountIds)];
-  const found: { id: string }[] = await transaction('accounts').whereIn('id', uniqueIds).select('id').forUpdate();
+  const found: { id: string }[] = await transaction('accounts')
+    .whereIn('id', uniqueIds)
+    .select('id')
+    .forUpdate();
   const foundIds = new Set(found.map((a: { id: string }) => a.id));
 
   const missing = uniqueIds.filter((id) => !foundIds.has(id));
@@ -197,18 +217,39 @@ async function validateAccountsExist(transaction: Knex.Transaction, accountIds: 
   }
 }
 
-async function validateSufficientFunds(transaction: Knex.Transaction, entries: CreateEntryInput[]): Promise<void> {
+async function validateSufficientFunds(
+  transaction: Knex.Transaction,
+  entries: CreateEntryInput[],
+): Promise<void> {
   const creditEntries = entries.filter((e) => e.direction === 'CREDIT');
   if (creditEntries.length === 0) return;
 
   const creditAccountIds = [...new Set(creditEntries.map((e) => e.account_id))];
 
+  const accounts = await transaction('accounts')
+    .whereIn('id', creditAccountIds)
+    .select('id', 'type');
+
+  const assetAccountIds = new Set(
+    accounts
+      .filter((a: { id: string; type: string }) => a.type === 'ASSET')
+      .map((a: { id: string; type: string }) => a.id),
+  );
+
+  if (assetAccountIds.size === 0) return;
+
+  const assetCreditEntries = creditEntries.filter((e) => assetAccountIds.has(e.account_id));
+
   const balanceRows = await transaction('entries')
-    .whereIn('account_id', creditAccountIds)
+    .whereIn('account_id', [...assetAccountIds])
     .select('account_id')
     .select(
-      transaction.raw(`COALESCE(SUM(CASE WHEN direction = 'DEBIT' THEN amount ELSE 0 END), 0) as total_debits`),
-      transaction.raw(`COALESCE(SUM(CASE WHEN direction = 'CREDIT' THEN amount ELSE 0 END), 0) as total_credits`),
+      transaction.raw(
+        `COALESCE(SUM(CASE WHEN direction = 'DEBIT' THEN amount ELSE 0 END), 0) as total_debits`,
+      ),
+      transaction.raw(
+        `COALESCE(SUM(CASE WHEN direction = 'CREDIT' THEN amount ELSE 0 END), 0) as total_credits`,
+      ),
     )
     .groupBy('account_id');
 
@@ -221,7 +262,7 @@ async function validateSufficientFunds(transaction: Knex.Transaction, entries: C
 
   // Accumulate total credits per account to catch multi-entry overdrafts
   const pendingCredits = new Map<string, Decimal>();
-  for (const entry of creditEntries) {
+  for (const entry of assetCreditEntries) {
     const current = pendingCredits.get(entry.account_id) ?? new Decimal(0);
     pendingCredits.set(entry.account_id, current.plus(entry.amount));
   }
