@@ -40,7 +40,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = uuidSchema.parse(req.params.id);
     const transfer = await getTransferById(id);
-    res.status(201).json({ transfer });
+    res.status(200).json({ transfer });
   } catch (err) {
     next(err);
   }
