@@ -29,5 +29,3 @@ export const createAccountSchema = z.object({
     .optional()
     .default(false),
 });
-
-export const uuidSchema = z.uuid('Invalid UUID format');
