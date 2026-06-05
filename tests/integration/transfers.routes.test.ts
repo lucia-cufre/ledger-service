@@ -186,6 +186,123 @@ describe('POST /transfers', () => {
   });
 });
 
+describe('GET /transfers/all/:accountId', () => {
+  it('returns empty array when account has no transfers', async () => {
+    const freshId = (
+      await request
+        .post('/accounts')
+        .send({ name: `Fresh-${unique()}`, type: 'ASSET', currency: 'USD' })
+    ).body.account.id;
+
+    const response = await request.get(`/transfers/all/${freshId}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.transfers).toEqual([]);
+  });
+
+  it('returns transfers with entries for an account', async () => {
+    const accountId = (
+      await request
+        .post('/accounts')
+        .send({ name: `Listed-${unique()}`, type: 'ASSET', currency: 'USD' })
+    ).body.account.id;
+
+    const key = unique();
+    await request.post('/transfers').set('Idempotency-Key', key).send({
+      idempotency_key: key,
+      description: 'Test listing',
+      entries: [
+        { account_id: accountId, direction: 'DEBIT', amount: '50.00', currency: 'USD' },
+        { account_id: revenueAccountId, direction: 'CREDIT', amount: '50.00', currency: 'USD' },
+      ],
+    });
+
+    const response = await request.get(`/transfers/all/${accountId}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.transfers).toHaveLength(1);
+    expect(response.body.transfers[0].entries).toBeDefined();
+    expect(response.body.transfers[0].entries.length).toBeGreaterThan(0);
+  });
+
+  it('does not include transfers from unrelated accounts', async () => {
+    const isolated = (
+      await request
+        .post('/accounts')
+        .send({ name: `Isolated-${unique()}`, type: 'ASSET', currency: 'USD' })
+    ).body.account.id;
+
+    const response = await request.get(`/transfers/all/${isolated}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.transfers).toEqual([]);
+  });
+
+  it('respects limit query param', async () => {
+    const accountId = (
+      await request
+        .post('/accounts')
+        .send({ name: `Paged-${unique()}`, type: 'ASSET', currency: 'USD' })
+    ).body.account.id;
+
+    for (let i = 0; i < 3; i++) {
+      const key = unique();
+      await request.post('/transfers').set('Idempotency-Key', key).send({
+        idempotency_key: key,
+        description: `Fund ${i}`,
+        entries: [
+          { account_id: accountId, direction: 'DEBIT', amount: '10.00', currency: 'USD' },
+          { account_id: revenueAccountId, direction: 'CREDIT', amount: '10.00', currency: 'USD' },
+        ],
+      });
+    }
+
+    const response = await request.get(`/transfers/all/${accountId}?limit=2`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.transfers).toHaveLength(2);
+  });
+
+  it('respects offset query param', async () => {
+    const accountId = (
+      await request
+        .post('/accounts')
+        .send({ name: `Offset-${unique()}`, type: 'ASSET', currency: 'USD' })
+    ).body.account.id;
+
+    for (let i = 0; i < 3; i++) {
+      const key = unique();
+      await request.post('/transfers').set('Idempotency-Key', key).send({
+        idempotency_key: key,
+        description: `Fund ${i}`,
+        entries: [
+          { account_id: accountId, direction: 'DEBIT', amount: '10.00', currency: 'USD' },
+          { account_id: revenueAccountId, direction: 'CREDIT', amount: '10.00', currency: 'USD' },
+        ],
+      });
+    }
+
+    const full = await request.get(`/transfers/all/${accountId}`);
+    const paged = await request.get(`/transfers/all/${accountId}?offset=1`);
+
+    expect(full.body.transfers).toHaveLength(3);
+    expect(paged.body.transfers).toHaveLength(2);
+  });
+
+  it('caps limit at 100', async () => {
+    const accountId = (
+      await request
+        .post('/accounts')
+        .send({ name: `Cap-${unique()}`, type: 'ASSET', currency: 'USD' })
+    ).body.account.id;
+
+    const response = await request.get(`/transfers/all/${accountId}?limit=9999`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.transfers.length).toBeLessThanOrEqual(100);
+  });
+});
+
 describe('GET /transfers/:id', () => {
   let transferId: string;
 

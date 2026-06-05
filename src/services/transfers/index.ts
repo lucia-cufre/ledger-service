@@ -15,6 +15,52 @@ import {
 } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 
+export interface ListTransfersOptions {
+  account_id?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function listTransfers(options: ListTransfersOptions): Promise<TransferWithEntries[]> {
+  const { account_id, limit = 20, offset = 0 } = options;
+
+  if (!account_id) {
+    logger.warn('Listing all transfers without account_id filter. This may be inefficient.');
+    throw new ValidationError('account_id query parameter is required');
+  }
+  
+  try {
+    const query = db('transfers')
+      .join('entries', 'entries.transfer_id', 'transfers.id')
+      .where('entries.account_id', account_id)
+      .distinct('transfers.*')
+      .orderBy('transfers.created_at', 'desc')
+      .limit(limit)
+      .offset(offset);
+
+    const transfers: Transfer[] = await query;
+
+    if (transfers.length === 0) return [];
+
+    const transferIds = transfers.map((t) => t.id);
+    const allEntries: Entry[] = await db('entries').whereIn('transfer_id', transferIds);
+
+    const byTransfer = new Map<string, Entry[]>();
+    for (const entry of allEntries) {
+      const list = byTransfer.get(entry.transfer_id) ?? [];
+      list.push(entry);
+      byTransfer.set(entry.transfer_id, list);
+    }
+
+    return transfers.map((t) => ({ ...t, entries: byTransfer.get(t.id) ?? [] }));
+  } catch (error) {
+    logger.error(
+      `Error listing transfers: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    throw error;
+  }
+}
+
 export async function getTransferById(id: string): Promise<TransferWithEntries> {
   try {
     const transfer: Transfer = await db('transfers').where({ id }).first();

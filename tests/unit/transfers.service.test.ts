@@ -15,6 +15,11 @@ const { mockDb, mockTrx } = vi.hoisted(() => {
     m.update = vi.fn().mockResolvedValue(1);
     m.forUpdate = vi.fn().mockReturnValue(m);
     m.raw = vi.fn().mockReturnValue(m);
+    m.join = vi.fn().mockReturnValue(m);
+    m.distinct = vi.fn().mockReturnValue(m);
+    m.orderBy = vi.fn().mockReturnValue(m);
+    m.limit = vi.fn().mockReturnValue(m);
+    m.offset = vi.fn().mockReturnValue(m);
     // Makes plain SELECT queries awaitable: await db('t').where({}) resolves via .then()
     m.then = vi.fn((resolve: (v: unknown) => void, reject: (r: unknown) => void) =>
       Promise.resolve([]).then(resolve, reject),
@@ -31,7 +36,7 @@ const { mockDb, mockTrx } = vi.hoisted(() => {
 
 vi.mock('../../src/database/client.js', () => ({ db: mockDb }));
 
-import { getTransferById, createTransfer, voidTransfer } from '../../src/services/tranfers/index.js';
+import { getTransferById, createTransfer, listTransfers, voidTransfer } from '../../src/services/transfers/index.js';
 import {
   NotFoundError,
   ConflictError,
@@ -75,6 +80,43 @@ const mockEntries = [
     created_at: new Date(),
   },
 ];
+
+describe('listTransfers', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('throws ValidationError when account_id is omitted', async () => {
+    await expect(listTransfers({})).rejects.toThrow(ValidationError);
+  });
+
+  it('returns empty array when no transfers exist for the account', async () => {
+    mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) => resolve([]));
+
+    const result = await listTransfers({ account_id: senderAccountId });
+
+    expect(result).toEqual([]);
+  });
+
+  it('returns transfers with their entries when found', async () => {
+    mockDb.then
+      .mockImplementationOnce((resolve: (v: unknown) => void) => resolve([mockTransfer]))
+      .mockImplementationOnce((resolve: (v: unknown) => void) => resolve(mockEntries));
+
+    const result = await listTransfers({ account_id: senderAccountId });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(mockTransfer.id);
+    expect(result[0].entries).toHaveLength(2);
+  });
+
+  it('applies the provided limit and offset', async () => {
+    mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) => resolve([]));
+
+    await listTransfers({ account_id: senderAccountId, limit: 5, offset: 10 });
+
+    expect(mockDb.limit).toHaveBeenCalledWith(5);
+    expect(mockDb.offset).toHaveBeenCalledWith(10);
+  });
+});
 
 describe('getTransferById', () => {
   beforeEach(() => vi.clearAllMocks());
