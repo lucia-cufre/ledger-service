@@ -1,24 +1,22 @@
 # ledger-service
 
-> **Work in progress.** The schema and core architecture are in place. API routes, service logic, and additional test coverage are being built incrementally. This README will be updated as each layer is completed.
-
 ## Introduction
 
-This project aims to be a **double-entry accounting ledger** built as a financial primitive — the kind of system that sits at the core of payment processors, crypto exchanges, and neobanks to guarantee that money is never created or destroyed.
+A **double-entry accounting ledger** built as a financial primitive — the kind of system that sits at the core of payment processors, crypto exchanges, and neobanks to guarantee that money is never created or destroyed.
 
-My goal with this project is to learn how financial services operate under the hood — what it actually takes to build software that users can rely on with their money.
+I built this project to understand how financial services operate under the hood — what it actually takes to build software that users can trust with their money. The result is a working REST API with accounts, transfers, voiding, and idempotency, backed by a database-level balance constraint that makes it impossible to produce an unbalanced ledger even under application failure.
 
-**What stacks am I using and why?**
+**What stack and why?**
 
-Node.js 22, TypeScript, Express 5, and PostgreSQL as the core. I chose PostgreSQL specifically because the balance-enforcement logic lives in the database itself as a constraint trigger — meaning even if the application misbehaves, the ledger still won't produce an unbalanced state. Knex as the query builder since it provides a better control under migrations. Redis for distributed locking on concurrent writes. Decimal.js for precise arithmetic — floating-point errors in financial systems have real consequences. The full breakdown is in the [Stack](#stack) section below.
+Node.js 22, TypeScript, Express 5, and PostgreSQL as the core. I chose PostgreSQL specifically because the balance-enforcement logic lives in the database itself as a constraint trigger — meaning even if the application misbehaves, the ledger still won't produce an unbalanced state. Knex as the query builder since it provides better control over migrations. Redis for distributed locking on concurrent writes. Decimal.js for precise arithmetic — floating-point errors in financial systems have real consequences. The full breakdown is in the [Stack](#stack) section below.
 
-**What am I experimenting with for the first time?**
+**What did I try for the first time?**
 
-This project is also an experiment in how I work. I built it with AI guidance — using Claude Code not to generate code for me, but to ask questions, think through approaches, and refine decisions based on how I like to write and organize my code.
+This project was also an experiment in how I work. I built it with AI guidance — using Claude Code not to generate code for me, but to ask questions, think through approaches, and refine decisions based on how I like to write and organize my code.
 
 Some of the libraries Claude suggested I had never used before. After looking into them I decided to give them a try and see if they actually made sense for me and the codebase: Zod for validation, Pino for structured logging, and Vitest for testing. I had also never worked with Node.js v22 — the newest version I'd used before was v18.
 
-Development is incremental — each step lives on its own branch with descriptive commits, so you can follow the full progression in the PRs section.
+Development is incremental — each step lives on its own branch with descriptive commits, so you can follow the full progression in the PRs.
 
 ## What is double-entry bookkeeping?
 
@@ -56,6 +54,21 @@ Account types follow standard accounting categories: `ASSET`, `LIABILITY`, `EQUI
 
 **Multi-currency**
 Both accounts and entries carry an explicit currency field, enabling cross-currency transfers and per-currency balance queries.
+
+## API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check |
+| `GET` | `/accounts` | List all accounts |
+| `GET` | `/accounts/:id` | Get account by ID |
+| `POST` | `/accounts` | Create an account |
+| `POST` | `/transfers` | Create a transfer (idempotent) |
+| `GET` | `/transfers/:id` | Get transfer with entries |
+| `GET` | `/transfers/all/:accountId` | Get all transfers for an account |
+| `POST` | `/transfers/:id/void` | Void a posted transfer |
+
+All write operations that mutate state require an `Idempotency-Key` header. Duplicate requests return the original response without re-executing side effects.
 
 ## Stack
 
@@ -149,19 +162,41 @@ npm run docker:down       # stop containers
 
 ```
 src/
-  app.ts                    # Express app factory
-  index.ts                  # Server entrypoint
-  config/env.ts             # Typed environment config (Zod)
-  lib/logger.ts             # Structured logger (Pino)
-  database/
-    models/                 # TypeScript types for DB entities
-    client.ts               # Migration runner connections
-
-knex/
-  migrations/               # Schema migrations (Knex)
+  app.ts                        # Express app factory
+  index.ts                      # Server entrypoint
+  config/env.ts                 # Typed environment config (Zod)
+  lib/
+    errors.ts                   # Typed error hierarchy
+    logger.ts                   # Structured logger (Pino)
+    validators/
+      account-validators.ts
+      transfers-validators.ts
+      utils-validators.ts
+  middleware/
+    errorHandler.ts             # Centralized error → HTTP response
+    idempotency.ts              # Idempotency-Key enforcement
+  routes/
+    index.ts
     accounts.ts
     transfers.ts
-    entries.ts              # Includes balance trigger
+  services/
+    accounts/index.ts
+    transfers/index.ts
+    idempotency-keys/index.ts
+  database/
+    client.ts
+    models/                     # TypeScript types for DB entities
+      accountModel.ts
+      transferModel.ts
+      entriesModel.ts
+      idempotencyKeysModel.ts
+
+knex/
+  migrations/                   # Schema migrations (Knex)
+    test.ts
+    accounts.ts
+    transfers.ts
+    entries.ts                  # Includes balance-enforcement trigger
     idempotency_keys.ts
 ```
 
