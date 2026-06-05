@@ -27,7 +27,7 @@ vi.mock('../../src/database/client.js', () => ({
 }));
 
 import { ValidationError } from '../../src/lib/errors.js';
-import { createTransfer } from '../../src/services/tranfers/index.js';
+import { createTransfer } from '../../src/services/transfers/index.js';
 
 describe('transfers — property based tests', () => {
   beforeEach(() => vi.clearAllMocks());
